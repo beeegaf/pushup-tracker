@@ -1,0 +1,524 @@
+/* ===== Variables & Reset ===== */
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface-hover: #242836;
+  --text: #e8e8ed;
+  --text-muted: #8b8d98;
+  --accent: #4ade80;
+  --accent-dim: rgba(74, 222, 128, 0.15);
+  --yellow: #facc15;
+  --yellow-dim: rgba(250, 204, 21, 0.15);
+  --red: #f87171;
+  --red-dim: rgba(248, 113, 113, 0.15);
+  --gray: #3a3d4a;
+  --radius: 12px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== App Container ===== */
+.app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
+/* ===== Header ===== */
+.header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 2px;
+}
+
+/* ===== Progress Ring ===== */
+.today-section {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.progress-ring-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto 12px;
+}
+
+.progress-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.progress-ring-bg {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 12;
+}
+
+.progress-ring-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-dasharray: 534.07;  /* 2 * PI * 85 */
+  stroke-dashoffset: 534.07;
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.count {
+  display: block;
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.goal {
+  display: block;
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.remaining-text {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.remaining-text.complete {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ===== Add Pushups ===== */
+.add-section {
+  margin-bottom: 28px;
+}
+
+.quick-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.add-btn {
+  background: var(--surface);
+  color: var(--text);
+  border: none;
+  border-radius: var(--radius);
+  padding: 14px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.add-btn:hover {
+  background: var(--surface-hover);
+}
+
+.add-btn:active {
+  transform: scale(0.95);
+  background: var(--accent-dim);
+}
+
+.custom-add {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.custom-add input {
+  flex: 1;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--gray);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 1rem;
+  outline: none;
+}
+
+.custom-add input:focus {
+  border-color: var(--accent);
+}
+
+.custom-add input::placeholder {
+  color: var(--text-muted);
+}
+
+.custom-btn {
+  padding: 12px 20px;
+}
+
+.undo-btn {
+  width: 100%;
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--gray);
+  border-radius: var(--radius);
+  padding: 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.undo-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.undo-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ===== Stats ===== */
+.stats-section {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.stat {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px 10px;
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ===== History ===== */
+.history-section {
+  margin-bottom: 28px;
+}
+
+.history-section h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.history-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.legend-dot.done { background: var(--accent); }
+.legend-dot.partial { background: var(--yellow); }
+.legend-dot.missed { background: var(--gray); }
+
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.history-day {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  position: relative;
+}
+
+.history-day .day-number {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.history-day .day-label {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.history-day.done {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.history-day.partial {
+  background: var(--yellow-dim);
+  color: var(--yellow);
+}
+
+.history-day.missed {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.history-day.today {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.history-day.future {
+  background: transparent;
+  opacity: 0.2;
+}
+
+/* ===== Reminders ===== */
+.reminders-section {
+  margin-bottom: 28px;
+}
+
+.reminders-section h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.notification-status {
+  font-size: 0.8rem;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  display: none;
+}
+
+.notification-status.warning {
+  display: block;
+  background: var(--yellow-dim);
+  color: var(--yellow);
+}
+
+.notification-status.info {
+  display: block;
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.reminders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.reminder-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.reminder-time {
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-width: 60px;
+  color: var(--accent);
+}
+
+.reminder-label {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.reminder-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 40px;
+  height: 22px;
+  background: var(--gray);
+  border-radius: 11px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.reminder-toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: var(--text);
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.reminder-toggle:checked {
+  background: var(--accent);
+}
+
+.reminder-toggle:checked::after {
+  transform: translateX(18px);
+}
+
+.reminder-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.reminder-delete:hover {
+  color: var(--red);
+}
+
+.add-reminder {
+  display: flex;
+  gap: 8px;
+}
+
+.add-reminder input[type="text"] {
+  flex: 1;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--gray);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.add-reminder input[type="text"]:focus {
+  border-color: var(--accent);
+}
+
+.add-reminder input[type="text"]::placeholder {
+  color: var(--text-muted);
+}
+
+.add-reminder input[type="time"] {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--gray);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  outline: none;
+  width: 110px;
+}
+
+.add-reminder input[type="time"]:focus {
+  border-color: var(--accent);
+}
+
+.add-reminder .add-btn {
+  padding: 10px 16px;
+  font-size: 0.9rem;
+}
+
+/* ===== Celebration Animation ===== */
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.celebrate .count {
+  animation: pop 0.4s ease;
+  color: var(--accent);
+}
+
+/* Number bump animation */
+@keyframes bump {
+  0% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.1); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+.progress-text.bump {
+  animation: bump 0.25s ease;
+}
+
+/* ===== Empty State ===== */
+.empty-reminders {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 16px;
+}
+
+/* ===== Responsive (wider screens) ===== */
+@media (min-width: 600px) {
+  .app {
+    padding: 40px 24px 60px;
+  }
+
+  .progress-ring-container {
+    width: 240px;
+    height: 240px;
+  }
+
+  .count {
+    font-size: 3.5rem;
+  }
+}

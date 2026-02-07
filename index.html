@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pushup Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- Header -->
+    <header class="header">
+      <h1>Pushup Tracker</h1>
+      <p class="subtitle">100 a day challenge</p>
+    </header>
+
+    <!-- Today's Progress Section -->
+    <section class="today-section">
+      <div class="progress-ring-container">
+        <svg class="progress-ring" viewBox="0 0 200 200">
+          <circle class="progress-ring-bg" cx="100" cy="100" r="85" />
+          <circle class="progress-ring-fill" cx="100" cy="100" r="85" />
+        </svg>
+        <div class="progress-text">
+          <span class="count" id="todayCount">0</span>
+          <span class="goal">/ 100</span>
+        </div>
+      </div>
+      <p class="remaining-text" id="remainingText">100 to go!</p>
+    </section>
+
+    <!-- Add Pushups Controls -->
+    <section class="add-section">
+      <div class="quick-buttons">
+        <button class="add-btn" data-amount="1">+1</button>
+        <button class="add-btn" data-amount="5">+5</button>
+        <button class="add-btn" data-amount="10">+10</button>
+        <button class="add-btn" data-amount="25">+25</button>
+      </div>
+      <div class="custom-add">
+        <input type="number" id="customAmount" min="1" max="100" placeholder="Custom #">
+        <button class="add-btn custom-btn" id="addCustomBtn">Add</button>
+      </div>
+      <button class="undo-btn" id="undoBtn" disabled>Undo last</button>
+    </section>
+
+    <!-- Stats Bar -->
+    <section class="stats-section">
+      <div class="stat">
+        <span class="stat-value" id="currentStreak">0</span>
+        <span class="stat-label">Day streak</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="bestStreak">0</span>
+        <span class="stat-label">Best streak</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="totalPushups">0</span>
+        <span class="stat-label">All time</span>
+      </div>
+    </section>
+
+    <!-- History Calendar -->
+    <section class="history-section">
+      <h2>History</h2>
+      <div class="history-legend">
+        <span class="legend-item"><span class="legend-dot done"></span> 100+</span>
+        <span class="legend-item"><span class="legend-dot partial"></span> 1-99</span>
+        <span class="legend-item"><span class="legend-dot missed"></span> Missed</span>
+      </div>
+      <div class="history-grid" id="historyGrid">
+        <!-- Filled by JS -->
+      </div>
+    </section>
+
+    <!-- Reminders Section -->
+    <section class="reminders-section">
+      <h2>Reminders</h2>
+      <div id="notificationStatus" class="notification-status"></div>
+      <div class="reminders-list" id="remindersList">
+        <!-- Filled by JS -->
+      </div>
+      <div class="add-reminder">
+        <input type="text" id="reminderLabel" placeholder="e.g. Do 25 pushups" maxlength="50">
+        <input type="time" id="reminderTime">
+        <button class="add-btn" id="addReminderBtn">Add</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
