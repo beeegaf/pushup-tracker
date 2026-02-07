@@ -642,6 +642,47 @@ function updateDisplay() {
   renderHistory();
 }
 
+// ===== Celebration (Confetti) =====
+
+function launchCelebration() {
+  const colors = ['#4ade80', '#facc15', '#60a5fa', '#f87171', '#c084fc', '#fb923c', '#22d3ee'];
+
+  // Create confetti container
+  const container = document.createElement('div');
+  container.className = 'confetti-container';
+  document.body.appendChild(container);
+
+  // Launch 80 confetti pieces
+  for (let i = 0; i < 80; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = Math.random() * 100 + '%';
+    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.width = (Math.random() * 8 + 6) + 'px';
+    piece.style.height = (Math.random() * 8 + 6) + 'px';
+    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    piece.style.animationDuration = (Math.random() * 1.5 + 1.5) + 's';
+    piece.style.animationDelay = (Math.random() * 0.8) + 's';
+    container.appendChild(piece);
+  }
+
+  // Show "GOAL!" banner
+  const banner = document.createElement('div');
+  banner.className = 'goal-banner';
+  banner.innerHTML = `
+    <span class="banner-emoji">💪🔥</span>
+    <span class="banner-text">GOAL REACHED!</span>
+    <span class="banner-sub">100 pushups today!</span>
+  `;
+  document.body.appendChild(banner);
+
+  // Clean up after animation
+  setTimeout(() => {
+    container.remove();
+    banner.remove();
+  }, 3500);
+}
+
 // ===== Add Pushups =====
 
 function addPushups(amount) {
@@ -664,6 +705,7 @@ function addPushups(amount) {
     setTimeout(() => {
       document.querySelector('.today-section').classList.remove('celebrate');
     }, 500);
+    launchCelebration();
   }
 
   updateDisplay();
