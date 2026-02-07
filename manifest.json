@@ -1,0 +1,25 @@
+{
+  "name": "Pushup Tracker",
+  "short_name": "Pushups",
+  "description": "100 a day pushup challenge with friends",
+  "start_url": "/pushup-tracker/",
+  "scope": "/pushup-tracker/",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
