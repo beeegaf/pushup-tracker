@@ -15,81 +15,184 @@
       <p class="subtitle">100 a day challenge</p>
     </header>
 
-    <!-- Today's Progress Section -->
-    <section class="today-section">
-      <div class="progress-ring-container">
-        <svg class="progress-ring" viewBox="0 0 200 200">
-          <circle class="progress-ring-bg" cx="100" cy="100" r="85" />
-          <circle class="progress-ring-fill" cx="100" cy="100" r="85" />
-        </svg>
-        <div class="progress-text">
-          <span class="count" id="todayCount">0</span>
-          <span class="goal">/ 100</span>
+    <!-- View Tabs -->
+    <nav class="view-tabs">
+      <button class="view-tab active" data-view="solo">My Pushups</button>
+      <button class="view-tab" data-view="friends">Friends</button>
+    </nav>
+
+    <!-- Group Banner (shown when not in a group) -->
+    <div class="group-banner" id="groupBanner">
+      <p>Track pushups with friends!</p>
+      <button class="add-btn" id="joinGroupBtn">Join a Group</button>
+    </div>
+
+    <!-- ===== SOLO VIEW ===== -->
+    <div class="view solo-view" id="soloView">
+
+      <!-- Today's Progress Section -->
+      <section class="today-section">
+        <div class="progress-ring-container">
+          <svg class="progress-ring" viewBox="0 0 200 200">
+            <circle class="progress-ring-bg" cx="100" cy="100" r="85" />
+            <circle class="progress-ring-fill" cx="100" cy="100" r="85" />
+          </svg>
+          <div class="progress-text">
+            <span class="count" id="todayCount">0</span>
+            <span class="goal">/ 100</span>
+          </div>
+        </div>
+        <p class="remaining-text" id="remainingText">100 to go!</p>
+      </section>
+
+      <!-- Add Pushups Controls -->
+      <section class="add-section">
+        <div class="quick-buttons">
+          <button class="add-btn" data-amount="1">+1</button>
+          <button class="add-btn" data-amount="5">+5</button>
+          <button class="add-btn" data-amount="10">+10</button>
+          <button class="add-btn" data-amount="25">+25</button>
+        </div>
+        <div class="custom-add">
+          <input type="number" id="customAmount" min="1" max="100" placeholder="Custom #">
+          <button class="add-btn custom-btn" id="addCustomBtn">Add</button>
+        </div>
+        <button class="undo-btn" id="undoBtn" disabled>Undo last</button>
+      </section>
+
+      <!-- Stats Bar -->
+      <section class="stats-section">
+        <div class="stat">
+          <span class="stat-value" id="currentStreak">0</span>
+          <span class="stat-label">Day streak</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="bestStreak">0</span>
+          <span class="stat-label">Best streak</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="totalPushups">0</span>
+          <span class="stat-label">All time</span>
+        </div>
+      </section>
+
+      <!-- Medals Section -->
+      <section class="medals-section" id="medalsSection">
+        <h2>Medals</h2>
+        <div class="medals-grid" id="medalsGrid">
+          <!-- Filled by JS -->
+        </div>
+      </section>
+
+      <!-- History Calendar -->
+      <section class="history-section">
+        <h2>History</h2>
+        <div class="history-legend">
+          <span class="legend-item"><span class="legend-dot done"></span> 100+</span>
+          <span class="legend-item"><span class="legend-dot partial"></span> 1-99</span>
+          <span class="legend-item"><span class="legend-dot missed"></span> Missed</span>
+        </div>
+        <div class="history-grid" id="historyGrid">
+          <!-- Filled by JS -->
+        </div>
+      </section>
+
+      <!-- Reminders Section -->
+      <section class="reminders-section">
+        <h2>Reminders</h2>
+        <div id="notificationStatus" class="notification-status"></div>
+        <div class="reminders-list" id="remindersList">
+          <!-- Filled by JS -->
+        </div>
+        <div class="add-reminder">
+          <input type="text" id="reminderLabel" placeholder="e.g. Do 25 pushups" maxlength="50">
+          <input type="time" id="reminderTime">
+          <button class="add-btn" id="addReminderBtn">Add</button>
+        </div>
+      </section>
+
+    </div><!-- /solo-view -->
+
+    <!-- ===== FRIENDS VIEW ===== -->
+    <div class="view friends-view" id="friendsView" style="display:none;">
+
+      <!-- Group Info Bar -->
+      <div class="group-info" id="groupInfo">
+        <div class="group-info-left">
+          <span class="group-code-label">Group:</span>
+          <span class="group-name" id="groupName"></span>
+        </div>
+        <button class="leave-btn" id="leaveGroupBtn">Leave</button>
+      </div>
+
+      <!-- Activity Feed -->
+      <div class="activity-feed" id="activityFeed">
+        <!-- Filled by JS -->
+      </div>
+
+      <!-- Leaderboard -->
+      <section class="leaderboard-section">
+        <div class="leaderboard-header">
+          <h2>Leaderboard</h2>
+          <div class="sort-toggle">
+            <button class="sort-btn active" data-sort="today">Today</button>
+            <button class="sort-btn" data-sort="streak">Streak</button>
+          </div>
+        </div>
+        <div class="leaderboard-list" id="leaderboardList">
+          <!-- Filled by JS -->
+        </div>
+      </section>
+
+      <!-- Weekly Winner -->
+      <section class="weekly-winner-section" id="weeklyWinnerSection" style="display:none;">
+        <div class="weekly-winner-card">
+          <span class="winner-crown">👑</span>
+          <div class="winner-info">
+            <span class="winner-label">Last week's winner</span>
+            <span class="winner-name" id="weeklyWinnerName"></span>
+            <span class="winner-detail" id="weeklyWinnerDetail"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Invite Box -->
+      <div class="invite-box">
+        <p>Invite friends with this code:</p>
+        <div class="invite-code-row">
+          <span class="invite-code" id="inviteCode"></span>
+          <button class="copy-btn" id="copyCodeBtn">Copy</button>
         </div>
       </div>
-      <p class="remaining-text" id="remainingText">100 to go!</p>
-    </section>
 
-    <!-- Add Pushups Controls -->
-    <section class="add-section">
-      <div class="quick-buttons">
-        <button class="add-btn" data-amount="1">+1</button>
-        <button class="add-btn" data-amount="5">+5</button>
-        <button class="add-btn" data-amount="10">+10</button>
-        <button class="add-btn" data-amount="25">+25</button>
-      </div>
-      <div class="custom-add">
-        <input type="number" id="customAmount" min="1" max="100" placeholder="Custom #">
-        <button class="add-btn custom-btn" id="addCustomBtn">Add</button>
-      </div>
-      <button class="undo-btn" id="undoBtn" disabled>Undo last</button>
-    </section>
+    </div><!-- /friends-view -->
 
-    <!-- Stats Bar -->
-    <section class="stats-section">
-      <div class="stat">
-        <span class="stat-value" id="currentStreak">0</span>
-        <span class="stat-label">Day streak</span>
-      </div>
-      <div class="stat">
-        <span class="stat-value" id="bestStreak">0</span>
-        <span class="stat-label">Best streak</span>
-      </div>
-      <div class="stat">
-        <span class="stat-value" id="totalPushups">0</span>
-        <span class="stat-label">All time</span>
-      </div>
-    </section>
+  </div><!-- /app -->
 
-    <!-- History Calendar -->
-    <section class="history-section">
-      <h2>History</h2>
-      <div class="history-legend">
-        <span class="legend-item"><span class="legend-dot done"></span> 100+</span>
-        <span class="legend-item"><span class="legend-dot partial"></span> 1-99</span>
-        <span class="legend-item"><span class="legend-dot missed"></span> Missed</span>
+  <!-- Group Join Modal -->
+  <div class="modal-overlay" id="groupModal" style="display:none;">
+    <div class="modal">
+      <h2>Join a Group</h2>
+      <input type="text" id="displayNameInput" placeholder="Your name" maxlength="20">
+      <input type="text" id="groupCodeInput" placeholder="Group code" maxlength="20">
+      <p class="modal-hint">Enter an existing code to join friends, or make up a new one to start a group.</p>
+      <div class="modal-error" id="modalError"></div>
+      <div class="modal-buttons">
+        <button class="add-btn" id="confirmJoinBtn">Join</button>
+        <button class="undo-btn" id="cancelJoinBtn">Cancel</button>
       </div>
-      <div class="history-grid" id="historyGrid">
-        <!-- Filled by JS -->
-      </div>
-    </section>
-
-    <!-- Reminders Section -->
-    <section class="reminders-section">
-      <h2>Reminders</h2>
-      <div id="notificationStatus" class="notification-status"></div>
-      <div class="reminders-list" id="remindersList">
-        <!-- Filled by JS -->
-      </div>
-      <div class="add-reminder">
-        <input type="text" id="reminderLabel" placeholder="e.g. Do 25 pushups" maxlength="50">
-        <input type="time" id="reminderTime">
-        <button class="add-btn" id="addReminderBtn">Add</button>
-      </div>
-    </section>
-
+    </div>
   </div>
 
+  <!-- Firebase SDK (compat for simplest usage) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- Firebase config -->
+  <script src="firebase-config.js"></script>
+
+  <!-- App logic -->
   <script src="app.js"></script>
 </body>
 </html>

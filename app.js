@@ -2,6 +2,20 @@
 const GOAL = 100;
 const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * 85; // matches SVG circle r=85
 
+// Medal definitions
+const MEDALS = [
+  // Milestone medals (total pushups)
+  { id: 'bronze',   emoji: '🥉', name: 'Bronze',         desc: '500 pushups',    type: 'total', threshold: 500 },
+  { id: 'silver',   emoji: '🥈', name: 'Silver',         desc: '1,000 pushups',  type: 'total', threshold: 1000 },
+  { id: 'gold',     emoji: '🥇', name: 'Gold',           desc: '2,500 pushups',  type: 'total', threshold: 2500 },
+  { id: 'diamond',  emoji: '💎', name: 'Diamond',        desc: '5,000 pushups',  type: 'total', threshold: 5000 },
+  { id: 'legend',   emoji: '🏆', name: 'Legend',         desc: '10,000 pushups', type: 'total', threshold: 10000 },
+  // Streak medals
+  { id: 'week',     emoji: '🔥', name: 'Week Warrior',   desc: '7-day streak',   type: 'streak', threshold: 7 },
+  { id: 'month',    emoji: '⚡', name: 'Monthly Machine', desc: '30-day streak',  type: 'streak', threshold: 30 },
+  { id: 'century',  emoji: '👑', name: 'Centurion',      desc: '100-day streak', type: 'streak', threshold: 100 },
+];
+
 // ===== DOM Elements =====
 const todayCountEl = document.getElementById('todayCount');
 const remainingTextEl = document.getElementById('remainingText');
@@ -19,14 +33,40 @@ const reminderLabelInput = document.getElementById('reminderLabel');
 const reminderTimeInput = document.getElementById('reminderTime');
 const addReminderBtn = document.getElementById('addReminderBtn');
 const notificationStatusEl = document.getElementById('notificationStatus');
+const medalsGrid = document.getElementById('medalsGrid');
+
+// Friends view elements
+const groupBanner = document.getElementById('groupBanner');
+const joinGroupBtn = document.getElementById('joinGroupBtn');
+const soloView = document.getElementById('soloView');
+const friendsView = document.getElementById('friendsView');
+const groupModal = document.getElementById('groupModal');
+const displayNameInput = document.getElementById('displayNameInput');
+const groupCodeInput = document.getElementById('groupCodeInput');
+const confirmJoinBtn = document.getElementById('confirmJoinBtn');
+const cancelJoinBtn = document.getElementById('cancelJoinBtn');
+const modalError = document.getElementById('modalError');
+const groupNameEl = document.getElementById('groupName');
+const leaveGroupBtn = document.getElementById('leaveGroupBtn');
+const leaderboardList = document.getElementById('leaderboardList');
+const activityFeed = document.getElementById('activityFeed');
+const inviteCodeEl = document.getElementById('inviteCode');
+const copyCodeBtn = document.getElementById('copyCodeBtn');
+const weeklyWinnerSection = document.getElementById('weeklyWinnerSection');
+const weeklyWinnerName = document.getElementById('weeklyWinnerName');
+const weeklyWinnerDetail = document.getElementById('weeklyWinnerDetail');
 
 // ===== State =====
 let lastAddedAmount = 0; // for undo
+let currentSort = 'today'; // 'today' or 'streak'
+let unsubscribeGroup = null; // Firestore listener unsubscribe function
+let previousMemberStates = {}; // for detecting completions
+let currentMembers = []; // latest snapshot of group members
+let previousMedalIds = new Set(); // for detecting new medals
 
 // ===== Helpers =====
 
 function getTodayKey() {
-  // Returns date string like "2026-02-06"
   const now = new Date();
   return now.toISOString().split('T')[0];
 }
@@ -36,11 +76,37 @@ function getDateKey(date) {
 }
 
 function formatTime12h(time24) {
-  // Converts "08:30" to "8:30 AM"
   const [h, m] = time24.split(':').map(Number);
   const ampm = h >= 12 ? 'PM' : 'AM';
   const hour12 = h % 12 || 12;
   return `${hour12}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function getUserProfile() {
+  const raw = localStorage.getItem('userProfile');
+  return raw ? JSON.parse(raw) : null;
+}
+
+function getWeekKey(date) {
+  // Returns "YYYY-Www" format for ISO week
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const week1 = new Date(d.getFullYear(), 0, 4);
+  const weekNum = 1 + Math.round(((d - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+  return `${d.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+}
+
+function getLastWeekKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  return getWeekKey(d);
 }
 
 // ===== Data Layer (localStorage) =====
@@ -72,6 +138,467 @@ function loadReminders() {
 
 function saveReminders(reminders) {
   localStorage.setItem('reminders', JSON.stringify(reminders));
+}
+
+// ===== Firebase Auth & Groups =====
+
+function initAuth() {
+  auth.signInAnonymously().then(() => {
+    const profile = getUserProfile();
+    if (profile) {
+      // Auto-rejoin the group
+      joinGroup(profile.groupCode, profile.displayName, true);
+      groupBanner.classList.remove('show');
+    } else {
+      groupBanner.classList.add('show');
+    }
+  }).catch(err => {
+    console.log('Auth error:', err);
+    // App still works in solo mode without auth
+    const profile = getUserProfile();
+    if (!profile) {
+      groupBanner.classList.add('show');
+    }
+  });
+}
+
+async function joinGroup(groupCode, displayName, isReconnect) {
+  const code = groupCode.toLowerCase().trim();
+  const name = displayName.trim();
+
+  if (!code || !name) {
+    modalError.textContent = 'Please enter both a name and group code.';
+    return;
+  }
+
+  if (code.length < 3) {
+    modalError.textContent = 'Group code must be at least 3 characters.';
+    return;
+  }
+
+  try {
+    const groupRef = db.collection('groups').doc(code);
+    const groupDoc = await groupRef.get();
+
+    if (groupDoc.exists) {
+      // Check if name is taken by someone else
+      const memberRef = groupRef.collection('members').doc(name.toLowerCase());
+      const memberDoc = await memberRef.get();
+
+      if (memberDoc.exists && !isReconnect) {
+        // Name exists — could be them on another device, allow it
+        // (merge logic will handle data)
+      }
+
+      // Add member name to group members array
+      await groupRef.update({
+        members: firebase.firestore.FieldValue.arrayUnion(name)
+      });
+    } else {
+      // Create new group
+      await groupRef.set({
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        members: [name]
+      });
+    }
+
+    // Upload current localStorage data to Firestore
+    const localData = loadPushupData();
+    const { currentStreak, bestStreak } = calculateStreaks();
+    const todayCount = getTodayCount();
+
+    const memberDocRef = groupRef.collection('members').doc(name.toLowerCase());
+    const existingMember = await memberDocRef.get();
+
+    if (existingMember.exists && isReconnect) {
+      // Merge cloud data with local data
+      const cloudData = existingMember.data().pushupData || {};
+      mergeWithCloud(cloudData);
+    }
+
+    // Write merged data to Firestore
+    const mergedData = loadPushupData();
+    await memberDocRef.set({
+      displayName: name,
+      pushupData: mergedData,
+      todayCount: mergedData[getTodayKey()] || 0,
+      currentStreak: currentStreak,
+      bestStreak: bestStreak,
+      lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    // Save profile locally
+    localStorage.setItem('userProfile', JSON.stringify({
+      groupCode: code,
+      displayName: name
+    }));
+
+    // Update UI
+    groupBanner.classList.remove('show');
+    groupNameEl.textContent = code;
+    inviteCodeEl.textContent = code;
+    hideModal();
+
+    // Start real-time listener
+    startGroupListener(code);
+
+    // Check for weekly winner
+    checkWeeklyWinner(code);
+
+  } catch (err) {
+    console.error('Join group error:', err);
+    modalError.textContent = 'Failed to join group. Check your connection and try again.';
+  }
+}
+
+function leaveGroup() {
+  if (unsubscribeGroup) {
+    unsubscribeGroup();
+    unsubscribeGroup = null;
+  }
+  localStorage.removeItem('userProfile');
+  previousMemberStates = {};
+  currentMembers = [];
+
+  // Switch to solo view
+  switchView('solo');
+  groupBanner.classList.add('show');
+  activityFeed.innerHTML = '';
+  leaderboardList.innerHTML = '';
+}
+
+function mergeWithCloud(cloudData) {
+  const localData = loadPushupData();
+  const merged = { ...cloudData };
+
+  // For each day, take the higher count (never lose pushups)
+  for (const [date, count] of Object.entries(localData)) {
+    if (!merged[date] || merged[date] < count) {
+      merged[date] = count;
+    }
+  }
+
+  savePushupData(merged);
+}
+
+// ===== Firestore Sync =====
+
+function syncToFirestore() {
+  const profile = getUserProfile();
+  if (!profile) return; // Not in a group, skip
+
+  const data = loadPushupData();
+  const { currentStreak, bestStreak } = calculateStreaks();
+
+  const memberRef = db.collection('groups').doc(profile.groupCode)
+    .collection('members').doc(profile.displayName.toLowerCase());
+
+  memberRef.update({
+    pushupData: data,
+    todayCount: data[getTodayKey()] || 0,
+    currentStreak: currentStreak,
+    bestStreak: bestStreak,
+    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(err => {
+    console.log('Sync error (will retry):', err.code);
+  });
+}
+
+// ===== View Switching =====
+
+function switchView(viewName) {
+  const profile = getUserProfile();
+
+  if (viewName === 'friends' && !profile) {
+    // Not in a group — show the join modal
+    showModal();
+    return;
+  }
+
+  // Update tab buttons
+  document.querySelectorAll('.view-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.view === viewName);
+  });
+
+  // Toggle views
+  soloView.style.display = viewName === 'solo' ? 'block' : 'none';
+  friendsView.style.display = viewName === 'friends' ? 'block' : 'none';
+}
+
+// ===== Modal =====
+
+function showModal() {
+  groupModal.style.display = 'flex';
+  modalError.textContent = '';
+  displayNameInput.value = '';
+  groupCodeInput.value = '';
+  displayNameInput.focus();
+}
+
+function hideModal() {
+  groupModal.style.display = 'none';
+  modalError.textContent = '';
+}
+
+// ===== Real-Time Leaderboard =====
+
+function startGroupListener(groupCode) {
+  if (unsubscribeGroup) unsubscribeGroup();
+
+  unsubscribeGroup = db.collection('groups').doc(groupCode)
+    .collection('members')
+    .onSnapshot(snapshot => {
+      const members = [];
+      snapshot.forEach(doc => {
+        members.push(doc.data());
+      });
+
+      currentMembers = members;
+
+      // Check for friend completions
+      checkForCompletions(members);
+
+      // Update previous states
+      members.forEach(m => {
+        previousMemberStates[m.displayName] = {
+          todayCount: m.todayCount || 0
+        };
+      });
+
+      // Render the leaderboard
+      renderLeaderboard(members);
+    }, err => {
+      console.error('Leaderboard listener error:', err);
+    });
+}
+
+function renderLeaderboard(members) {
+  const profile = getUserProfile();
+  if (!profile) return;
+
+  leaderboardList.innerHTML = '';
+
+  if (members.length === 0) {
+    leaderboardList.innerHTML = '<p class="leaderboard-empty">No members yet.</p>';
+    return;
+  }
+
+  // Sort members
+  const sorted = [...members].sort((a, b) => {
+    if (currentSort === 'today') {
+      return (b.todayCount || 0) - (a.todayCount || 0);
+    } else {
+      return (b.currentStreak || 0) - (a.currentStreak || 0);
+    }
+  });
+
+  sorted.forEach((member, index) => {
+    const isMe = member.displayName === profile.displayName;
+    const todayCount = member.todayCount || 0;
+    const streak = member.currentStreak || 0;
+    const pushupData = member.pushupData || {};
+
+    // Calculate medals for this member
+    const memberMedals = calculateMedals(pushupData, member.bestStreak || streak);
+
+    // Get last 7 days
+    const last7 = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = getDateKey(d);
+      last7.push(pushupData[key] || 0);
+    }
+
+    const item = document.createElement('div');
+    item.className = `leaderboard-item${isMe ? ' is-me' : ''}`;
+
+    const todayClass = todayCount >= GOAL ? 'stat-complete' : 'stat-highlight';
+    const medalEmojis = memberMedals.filter(m => m.earned).map(m => m.emoji).join('');
+
+    item.innerHTML = `
+      <div class="member-header">
+        <span class="member-rank">${index + 1}.</span>
+        <span class="member-name${isMe ? ' is-me' : ''}">${escapeHtml(member.displayName)}</span>
+        <span class="member-medals">${medalEmojis}</span>
+      </div>
+      <div class="member-stats">
+        <span>Today: <span class="${todayClass}">${todayCount}</span></span>
+        <span>Streak: <span class="stat-highlight">${streak}</span></span>
+      </div>
+      <div class="member-week">
+        ${last7.map(count => {
+          const cls = count >= GOAL ? 'done' : count > 0 ? 'partial' : 'missed';
+          return `<span class="week-dot ${cls}">${count}</span>`;
+        }).join('')}
+      </div>
+    `;
+
+    leaderboardList.appendChild(item);
+  });
+}
+
+// ===== Activity Feed =====
+
+function checkForCompletions(members) {
+  const profile = getUserProfile();
+  if (!profile) return;
+
+  members.forEach(member => {
+    const prev = previousMemberStates[member.displayName];
+    const todayCount = member.todayCount || 0;
+
+    if (prev &&
+        prev.todayCount < GOAL &&
+        todayCount >= GOAL &&
+        member.displayName !== profile.displayName) {
+      // This friend just hit 100!
+      addActivityItem(`${member.displayName} just completed 100! 💪`);
+      notifyFriendCompletion(member.displayName);
+    }
+  });
+}
+
+function addActivityItem(message) {
+  const item = document.createElement('div');
+  item.className = 'activity-item';
+  item.innerHTML = `<span class="activity-icon">🎉</span> ${escapeHtml(message)}`;
+  activityFeed.prepend(item);
+
+  // Limit to 5 items
+  while (activityFeed.children.length > 5) {
+    activityFeed.removeChild(activityFeed.lastChild);
+  }
+
+  // Auto-remove after 60 seconds
+  setTimeout(() => {
+    if (item.parentNode) item.remove();
+  }, 60000);
+}
+
+function notifyFriendCompletion(friendName) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  new Notification('Pushup Tracker', {
+    body: `${friendName} just completed their 100 pushups!`,
+    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="80" font-size="80">💪</text></svg>'
+  });
+}
+
+// ===== Weekly Winner =====
+
+async function checkWeeklyWinner(groupCode) {
+  try {
+    const groupRef = db.collection('groups').doc(groupCode);
+    const groupDoc = await groupRef.get();
+    const groupData = groupDoc.data();
+    const lastWeek = getLastWeekKey();
+
+    // Check if we already have a winner for last week
+    const weeklyWinners = groupData.weeklyWinners || {};
+
+    if (weeklyWinners[lastWeek]) {
+      // Show existing winner
+      showWeeklyWinner(weeklyWinners[lastWeek].name, weeklyWinners[lastWeek].total);
+      return;
+    }
+
+    // Calculate last week's winner from member data
+    const membersSnap = await groupRef.collection('members').get();
+    let bestMember = null;
+    let bestTotal = 0;
+
+    // Get last week's Monday-Sunday dates
+    const today = new Date();
+    const lastMonday = new Date(today);
+    lastMonday.setDate(lastMonday.getDate() - lastMonday.getDay() - 6); // Monday of last week
+    if (lastMonday.getDay() !== 1) {
+      lastMonday.setDate(lastMonday.getDate() - ((lastMonday.getDay() + 6) % 7));
+    }
+
+    membersSnap.forEach(doc => {
+      const member = doc.data();
+      const pushupData = member.pushupData || {};
+      let weekTotal = 0;
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(lastMonday);
+        d.setDate(d.getDate() + i);
+        const key = getDateKey(d);
+        weekTotal += pushupData[key] || 0;
+      }
+
+      if (weekTotal > bestTotal) {
+        bestTotal = weekTotal;
+        bestMember = member.displayName;
+      }
+    });
+
+    if (bestMember && bestTotal > 0) {
+      // Store the winner
+      await groupRef.update({
+        [`weeklyWinners.${lastWeek}`]: {
+          name: bestMember,
+          total: bestTotal
+        }
+      });
+
+      showWeeklyWinner(bestMember, bestTotal);
+    }
+
+  } catch (err) {
+    console.log('Weekly winner check error:', err);
+  }
+}
+
+function showWeeklyWinner(name, total) {
+  weeklyWinnerName.textContent = name;
+  weeklyWinnerDetail.textContent = `${total.toLocaleString()} pushups last week`;
+  weeklyWinnerSection.style.display = 'block';
+}
+
+// ===== Medals =====
+
+function calculateMedals(pushupData, bestStreak) {
+  const total = Object.values(pushupData || {}).reduce((sum, v) => sum + v, 0);
+  const streak = bestStreak || 0;
+
+  return MEDALS.map(medal => {
+    let earned = false;
+    if (medal.type === 'total') {
+      earned = total >= medal.threshold;
+    } else if (medal.type === 'streak') {
+      earned = streak >= medal.threshold;
+    }
+    return { ...medal, earned };
+  });
+}
+
+function renderMedals() {
+  const data = loadPushupData();
+  const { bestStreak } = calculateStreaks();
+  const medals = calculateMedals(data, bestStreak);
+
+  medalsGrid.innerHTML = '';
+
+  // Check for newly earned medals
+  const currentEarnedIds = new Set(medals.filter(m => m.earned).map(m => m.id));
+
+  medals.forEach(medal => {
+    const item = document.createElement('div');
+    const isNew = medal.earned && !previousMedalIds.has(medal.id) && previousMedalIds.size > 0;
+    item.className = `medal-item ${medal.earned ? 'earned' : 'locked'}${isNew ? ' just-earned' : ''}`;
+    item.innerHTML = `
+      <span class="medal-emoji">${medal.emoji}</span>
+      <div class="medal-info">
+        <span class="medal-name">${medal.name}</span>
+        <span class="medal-desc">${medal.desc}</span>
+      </div>
+    `;
+    medalsGrid.appendChild(item);
+  });
+
+  previousMedalIds = currentEarnedIds;
 }
 
 // ===== Progress Ring =====
@@ -108,6 +635,9 @@ function updateDisplay() {
   // Update stats
   updateStats();
 
+  // Update medals
+  renderMedals();
+
   // Update history
   renderHistory();
 }
@@ -125,7 +655,6 @@ function addPushups(amount) {
 
   // Trigger bump animation
   progressText.classList.remove('bump');
-  // Force reflow to restart animation
   void progressText.offsetWidth;
   progressText.classList.add('bump');
 
@@ -138,6 +667,7 @@ function addPushups(amount) {
   }
 
   updateDisplay();
+  syncToFirestore(); // Sync to cloud
 }
 
 function undoLast() {
@@ -146,6 +676,7 @@ function undoLast() {
   setTodayCount(current - lastAddedAmount);
   lastAddedAmount = 0;
   updateDisplay();
+  syncToFirestore(); // Sync to cloud
 }
 
 // ===== Stats =====
@@ -167,19 +698,14 @@ function calculateStreaks() {
     if (count >= GOAL) {
       tempStreak++;
       if (i === currentStreak) {
-        // Still counting from today
         currentStreak = tempStreak;
       }
     } else {
-      // If today and count > 0 but not at goal, don't break current streak check
-      // (the streak counts completed days only)
       if (i === 0 && count > 0) {
-        // Today is in progress, check yesterday for streak
         tempStreak = 0;
         continue;
       }
       if (i === 0 && count === 0) {
-        // Haven't started today, check yesterday for streak
         tempStreak = 0;
         continue;
       }
@@ -228,8 +754,6 @@ function renderHistory() {
   const today = new Date();
   historyGrid.innerHTML = '';
 
-  // Show last 28 days (4 weeks)
-  // Find the Monday that starts the grid (go back to fill a 4-week block)
   const daysToShow = 28;
 
   // Day-of-week headers
@@ -243,15 +767,12 @@ function renderHistory() {
     historyGrid.appendChild(el);
   });
 
-  // Calculate start date: go back 27 days from today, then adjust to Monday
   const startDate = new Date(today);
   startDate.setDate(startDate.getDate() - 27);
-  // Adjust to previous Monday (0=Sun, 1=Mon, ..., 6=Sat)
   const dayOfWeek = startDate.getDay();
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   startDate.setDate(startDate.getDate() + mondayOffset);
 
-  // Calculate how many days to render (from that Monday through today's week's Sunday)
   const endDate = new Date(today);
   const endDayOfWeek = endDate.getDay();
   const sundayOffset = endDayOfWeek === 0 ? 0 : 7 - endDayOfWeek;
@@ -302,7 +823,6 @@ function renderReminders() {
     return;
   }
 
-  // Sort by time
   reminders.sort((a, b) => a.time.localeCompare(b.time));
 
   reminders.forEach(r => {
@@ -316,12 +836,6 @@ function renderReminders() {
     `;
     remindersList.appendChild(item);
   });
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }
 
 function addReminder() {
@@ -376,19 +890,17 @@ function initNotifications() {
     notificationStatusEl.className = 'notification-status info';
     document.getElementById('enableNotifBtn').addEventListener('click', () => {
       Notification.requestPermission().then(perm => {
-        initNotifications(); // re-run to update status
+        initNotifications();
       });
     });
   } else if (Notification.permission === 'denied') {
     notificationStatusEl.textContent = 'Notifications are blocked. Enable them in your browser settings to receive reminders.';
     notificationStatusEl.className = 'notification-status warning';
   } else {
-    // granted
     notificationStatusEl.style.display = 'none';
   }
 }
 
-// Track which reminders have already fired this minute to avoid repeats
 const firedReminders = new Set();
 
 function checkReminders() {
@@ -405,7 +917,6 @@ function checkReminders() {
     const fireKey = `${r.id}-${currentTime}`;
     if (firedReminders.has(fireKey)) return;
 
-    // Fire this reminder
     firedReminders.add(fireKey);
     const remaining = Math.max(0, GOAL - getTodayCount());
 
@@ -415,13 +926,65 @@ function checkReminders() {
     });
   });
 
-  // Clear fired set every new minute
   if (now.getSeconds() === 0) {
     firedReminders.clear();
   }
 }
 
 // ===== Event Listeners =====
+
+// View tabs
+document.querySelectorAll('.view-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    switchView(tab.dataset.view);
+  });
+});
+
+// Join group button (on banner)
+joinGroupBtn.addEventListener('click', showModal);
+
+// Modal buttons
+confirmJoinBtn.addEventListener('click', () => {
+  joinGroup(groupCodeInput.value, displayNameInput.value, false);
+});
+
+cancelJoinBtn.addEventListener('click', hideModal);
+
+// Close modal on overlay click
+groupModal.addEventListener('click', (e) => {
+  if (e.target === groupModal) hideModal();
+});
+
+// Enter key in modal inputs
+displayNameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') groupCodeInput.focus();
+});
+groupCodeInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') confirmJoinBtn.click();
+});
+
+// Leave group
+leaveGroupBtn.addEventListener('click', leaveGroup);
+
+// Sort toggle
+document.querySelectorAll('.sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentSort = btn.dataset.sort;
+    document.querySelectorAll('.sort-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.sort === currentSort);
+    });
+    renderLeaderboard(currentMembers);
+  });
+});
+
+// Copy invite code
+copyCodeBtn.addEventListener('click', () => {
+  const code = inviteCodeEl.textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    copyCodeBtn.textContent = 'Copied!';
+    setTimeout(() => { copyCodeBtn.textContent = 'Copy'; }, 2000);
+  });
+});
 
 // Quick-add buttons
 document.querySelectorAll('.quick-buttons .add-btn').forEach(btn => {
@@ -440,7 +1003,6 @@ addCustomBtn.addEventListener('click', () => {
   }
 });
 
-// Allow pressing Enter in the custom input
 customAmountInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     addCustomBtn.click();
@@ -450,7 +1012,7 @@ customAmountInput.addEventListener('keydown', (e) => {
 // Undo
 undoBtn.addEventListener('click', undoLast);
 
-// Reminders list (event delegation for toggles and deletes)
+// Reminders list (event delegation)
 remindersList.addEventListener('change', (e) => {
   if (e.target.classList.contains('reminder-toggle')) {
     toggleReminder(Number(e.target.dataset.id));
@@ -466,7 +1028,6 @@ remindersList.addEventListener('click', (e) => {
 // Add reminder
 addReminderBtn.addEventListener('click', addReminder);
 
-// Allow pressing Enter in the reminder label input
 reminderLabelInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     addReminder();
@@ -476,14 +1037,22 @@ reminderLabelInput.addEventListener('keydown', (e) => {
 // ===== Init =====
 
 function init() {
+  // Initialize previous medals so first render doesn't trigger celebration
+  const data = loadPushupData();
+  const { bestStreak } = calculateStreaks();
+  const medals = calculateMedals(data, bestStreak);
+  previousMedalIds = new Set(medals.filter(m => m.earned).map(m => m.id));
+
   updateDisplay();
   renderReminders();
   initNotifications();
 
   // Check reminders every 30 seconds
   setInterval(checkReminders, 30000);
-  // Also check right away
   checkReminders();
+
+  // Firebase auth
+  initAuth();
 }
 
 init();
